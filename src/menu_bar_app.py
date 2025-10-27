@@ -264,50 +264,49 @@ class DropboxSyncApp(rumps.App):
         try:
             current_interval = self.prefs.sync_interval_minutes
 
-            # Build button labels with checkmark for current interval
-            intervals = [5, 10, 15, 30]
-            labels = []
-            for interval in intervals:
-                if interval == current_interval:
-                    labels.append(f"✓ {interval} min")
-                else:
-                    labels.append(f"{interval} min")
-
-            # Show alert with buttons
-            # rumps.alert expects: ok (str), cancel (str), other (list of str)
-            response = rumps.alert(
-                title="Sync Interval",
-                message=f"Current: {current_interval} minutes\n\nChoose new interval:",
-                ok=labels[0],  # First button (5 min)
-                cancel="Cancel",
-                other=[labels[1], labels[2], labels[3]]  # Rest of buttons as list
+            # Use text input window (more reliable than alert buttons)
+            window = rumps.Window(
+                message=f"Current interval: {current_interval} minutes\n\nEnter new interval (5, 10, 15, or 30):",
+                title="Preferences",
+                default_text=str(current_interval),
+                ok="Update",
+                cancel="Cancel"
             )
 
-            # Map response to interval
-            # response: 0=cancel, 1=ok (first button), 2+=other buttons
-            if response == 0:
-                # User cancelled
-                return
+            response = window.run()
 
-            # Determine which button was clicked
-            button_index = response - 1  # Convert to 0-based index
-            if 0 <= button_index < len(intervals):
-                new_interval = intervals[button_index]
+            if response.clicked:
+                # User clicked Update
+                try:
+                    new_interval = int(response.text)
+                    if new_interval not in (5, 10, 15, 30):
+                        rumps.alert(
+                            title="Invalid Interval",
+                            message="Please enter 5, 10, 15, or 30 minutes.",
+                            ok="OK"
+                        )
+                        return
 
-                # Only update if changed
-                if new_interval != current_interval:
-                    # Update preferences
-                    self.prefs.sync_interval_minutes = new_interval
-                    self.sync_worker.update_interval(new_interval)
+                    # Only update if changed
+                    if new_interval != current_interval:
+                        # Update preferences
+                        self.prefs.sync_interval_minutes = new_interval
+                        self.sync_worker.update_interval(new_interval)
 
-                    # Update interval display in menu
-                    self._update_interval_display()
+                        # Update interval display in menu
+                        self._update_interval_display()
 
-                    rumps.notification(
-                        title="Preferences Updated",
-                        subtitle="",
-                        message=f"Sync interval changed to {new_interval} minutes",
-                        sound=False
+                        rumps.notification(
+                            title="Preferences Updated",
+                            subtitle="",
+                            message=f"Sync interval changed to {new_interval} minutes",
+                            sound=False
+                        )
+                except ValueError:
+                    rumps.alert(
+                        title="Invalid Input",
+                        message="Please enter a number (5, 10, 15, or 30).",
+                        ok="OK"
                     )
         except Exception as e:
             logging.error(f"Error in preferences dialog: {e}", exc_info=True)
