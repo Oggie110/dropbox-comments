@@ -11,6 +11,8 @@ DEFAULT_PREFERENCES = {
     "notify_new_comments": True,
     "notify_errors": True,
     "notify_summary": False,  # Summary after each sync (can be noisy)
+    "today_count": 0,  # Count of comments synced today
+    "today_date": None,  # Date string (YYYY-MM-DD) for today's count
 }
 
 
@@ -94,6 +96,28 @@ class Preferences:
     @notify_summary.setter
     def notify_summary(self, value: bool) -> None:
         self._prefs["notify_summary"] = value
+        self.save()
+
+    @property
+    def today_count(self) -> int:
+        """Get today's comment count."""
+        return self._prefs.get("today_count", 0)
+
+    @today_count.setter
+    def today_count(self, value: int) -> None:
+        """Set today's comment count."""
+        self._prefs["today_count"] = value
+        self.save()
+
+    @property
+    def today_date(self) -> str | None:
+        """Get the date for today's count (YYYY-MM-DD)."""
+        return self._prefs.get("today_date")
+
+    @today_date.setter
+    def today_date(self, value: str) -> None:
+        """Set the date for today's count (YYYY-MM-DD)."""
+        self._prefs["today_date"] = value
         self.save()
 
     def reset_to_defaults(self) -> None:

@@ -36,8 +36,9 @@ class DropboxSyncApp(rumps.App):
         # State
         self.current_status = SyncStatus.IDLE
         self.last_result: SyncResult | None = None
-        self.today_comment_count = 0
-        self._today_date = datetime.now().date()
+
+        # Load today's count from persistent storage
+        self._load_today_count()
 
         # Communication with worker thread
         self.result_queue: Queue = Queue()
@@ -56,6 +57,26 @@ class DropboxSyncApp(rumps.App):
 
         # Start the sync worker
         self.sync_worker.start()
+
+    def _load_today_count(self) -> None:
+        """Load today's count from preferences, reset if new day."""
+        today_str = datetime.now().date().isoformat()
+        stored_date = self.prefs.today_date
+
+        if stored_date == today_str:
+            # Same day, load the count
+            self.today_comment_count = self.prefs.today_count
+        else:
+            # New day, reset count
+            self.today_comment_count = 0
+            self.prefs.today_date = today_str
+            self.prefs.today_count = 0
+
+    def _save_today_count(self) -> None:
+        """Save today's count to preferences."""
+        today_str = datetime.now().date().isoformat()
+        self.prefs.today_date = today_str
+        self.prefs.today_count = self.today_comment_count
 
     def _build_menu(self) -> None:
         """Build the menu bar menu."""
@@ -121,12 +142,6 @@ class DropboxSyncApp(rumps.App):
 
     def _update_count_display(self) -> None:
         """Update the today's count line in the menu."""
-        # Reset count if it's a new day
-        today = datetime.now().date()
-        if today != self._today_date:
-            self._today_date = today
-            self.today_comment_count = 0
-
         if self.today_comment_count == 0:
             self.count_item.title = "Today: No new comments"
         elif self.today_comment_count == 1:
@@ -167,8 +182,9 @@ class DropboxSyncApp(rumps.App):
             # Sync completed successfully
             processed = result.processed_count
 
-            # Update today's count
+            # Update today's count and save to preferences
             self.today_comment_count += processed
+            self._save_today_count()
 
             # Update display
             self._update_status_display()
@@ -232,24 +248,13 @@ class DropboxSyncApp(rumps.App):
 
     def show_preferences(self, _sender: rumps.MenuItem) -> None:
         """Callback for 'Preferences' button - show preferences dialog."""
-        # Build preferences window
-        window = rumps.Window(
-            title="Preferences",
-            message="Configure sync settings:",
-            default_text="",
-            ok="Save",
-            cancel="Cancel",
-            dimensions=(320, 160)
-        )
-
-        # For simplicity, use a dialog to show/change sync interval
         current_interval = self.prefs.sync_interval_minutes
         response = rumps.alert(
-            title="Sync Interval",
-            message=f"Current interval: {current_interval} minutes\n\nChoose sync interval:",
-            ok="5 minutes",
+            title="Preferences",
+            message=f"Current sync interval: {current_interval} minutes\n\nChoose new sync interval:",
+            ok="5 min",
             cancel="Cancel",
-            other=["10 minutes", "15 minutes", "30 minutes"]
+            other=["10 min", "15 min", "30 min"]
         )
 
         # Map response to interval
@@ -291,7 +296,7 @@ class DropboxSyncApp(rumps.App):
         )
 
     @rumps.clicked("Quit")
-    def quit_clicked(self, _sender: rumps.MenuItem) -> None:
+    def on_quit(self, _sender: rumps.MenuItem) -> None:
         """Callback when Quit button is clicked - cleanup before exit."""
         logging.info("Quit requested by user")
         # Stop the sync worker gracefully
