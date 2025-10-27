@@ -264,23 +264,23 @@ class DropboxSyncApp(rumps.App):
         try:
             current_interval = self.prefs.sync_interval_minutes
 
-            # Create submenu with interval options
-            # Build button list: highlight current interval
+            # Build button labels with checkmark for current interval
             intervals = [5, 10, 15, 30]
-            buttons = []
+            labels = []
             for interval in intervals:
                 if interval == current_interval:
-                    buttons.append(f"✓ {interval} minutes")
+                    labels.append(f"✓ {interval} min")
                 else:
-                    buttons.append(f"{interval} minutes")
+                    labels.append(f"{interval} min")
 
             # Show alert with buttons
+            # rumps.alert expects: ok (str), cancel (str), other (list of str)
             response = rumps.alert(
                 title="Sync Interval",
                 message=f"Current: {current_interval} minutes\n\nChoose new interval:",
-                ok=buttons[0],  # 5 min
+                ok=labels[0],  # First button (5 min)
                 cancel="Cancel",
-                other=buttons[1:]  # 10, 15, 30 min
+                other=[labels[1], labels[2], labels[3]]  # Rest of buttons as list
             )
 
             # Map response to interval
@@ -310,10 +310,10 @@ class DropboxSyncApp(rumps.App):
                         sound=False
                     )
         except Exception as e:
-            logging.error(f"Error in preferences dialog: {e}")
+            logging.error(f"Error in preferences dialog: {e}", exc_info=True)
             rumps.alert(
                 title="Error",
-                message=f"Failed to update preferences: {e}",
+                message=f"Failed to update preferences: {str(e)}",
                 ok="OK"
             )
 
