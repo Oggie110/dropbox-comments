@@ -29,8 +29,7 @@ class DropboxSyncApp(rumps.App):
     def __init__(self, config: Config, preferences: Preferences):
         super().__init__(
             name="Dropbox Sync",
-            icon=ICON_IDLE,
-            quit_button=None,  # We'll add our own quit button
+            title="☁️",  # Use title instead of icon for emoji
         )
 
         self.config = config
@@ -85,13 +84,7 @@ class DropboxSyncApp(rumps.App):
         # About
         self.about_button = rumps.MenuItem("About", callback=self.show_about)
 
-        # Separator
-        sep3 = rumps.separator
-
-        # Quit
-        self.quit_button = rumps.MenuItem("Quit", callback=self.quit_app)
-
-        # Add all items to menu
+        # Add all items to menu (rumps will add Quit button automatically)
         self.menu = [
             self.status_item,
             self.count_item,
@@ -102,8 +95,6 @@ class DropboxSyncApp(rumps.App):
             sep2,
             self.prefs_button,
             self.about_button,
-            sep3,
-            self.quit_button,
         ]
 
     def _update_status_display(self) -> None:
@@ -114,21 +105,21 @@ class DropboxSyncApp(rumps.App):
                 self.status_item.title = f"Status: Last synced at {last_time}"
             else:
                 self.status_item.title = "Status: Idle"
-            self.icon = ICON_IDLE
+            # Icon stays as cloud emoji
 
         elif self.current_status == SyncStatus.SYNCING:
             self.status_item.title = "Status: Syncing..."
-            self.icon = ICON_SYNCING
+            # Icon stays as cloud emoji
 
         elif self.current_status == SyncStatus.SUCCESS:
             if self.last_result:
                 last_time = self.last_result.timestamp.strftime("%H:%M")
                 self.status_item.title = f"Status: Synced at {last_time}"
-            self.icon = ICON_SUCCESS
+            # Icon stays as cloud emoji
 
         elif self.current_status == SyncStatus.ERROR:
             self.status_item.title = "Status: Error (see logs)"
-            self.icon = ICON_ERROR
+            # Icon stays as cloud emoji
 
     def _update_count_display(self) -> None:
         """Update the today's count line in the menu."""
@@ -301,13 +292,12 @@ class DropboxSyncApp(rumps.App):
             ok="OK"
         )
 
-    def quit_app(self, _sender: rumps.MenuItem) -> None:
-        """Callback for 'Quit' button."""
+    @rumps.clicked("Quit")
+    def quit_clicked(self, _sender: rumps.MenuItem) -> None:
+        """Callback when Quit button is clicked - cleanup before exit."""
         logging.info("Quit requested by user")
-
-        # Stop the sync worker
+        # Stop the sync worker gracefully
         self.sync_worker.stop()
-
         # Quit the app
         rumps.quit_application()
 
