@@ -2,7 +2,9 @@
 
 ## Project Overview
 
-**dropbox-comments-sync v0.1.0** is a production automation system that syncs Dropbox file comment notifications from Gmail to a Google Sheet. The system runs autonomously every 15 minutes via macOS launchd.
+**dropbox-comments-sync v0.2.0** is a production automation system that syncs Dropbox file comment notifications from Gmail to a Google Sheet. The system can run as either:
+- **CLI mode**: Scheduled by macOS launchd (v0.1.0+)
+- **Menu bar app**: Visual UI with timer and notifications (v0.2.0+)
 
 ## Architecture
 
@@ -198,6 +200,199 @@ python -m src.sync
 
 6. **Sheet row deletions**: If a row is deleted from the sheet, the cached mapping becomes stale. The code will re-match on next comment, but the old mapping lingers in state file.
 
+## Menu Bar App (v0.2.0)
+
+### Overview
+
+Version 0.2.0 introduces a macOS menu bar application that provides visual feedback and manual control over the sync process. The menu bar app **reuses all existing sync logic** - only the UI layer is new.
+
+### Architecture
+
+**Threading Model**:
+- **Main Thread**: Runs `rumps.App` event loop (UI, menu, notifications)
+- **Worker Thread**: Runs sync operations (`sync_worker.py`)
+- **Communication**: Queue-based (worker → UI), event flags (UI → worker)
+
+```
+┌─────────────────────────────────────────┐
+│  DropboxSyncApp (Main Thread)           │
+│  - rumps.App event loop                 │
+│  - Updates menu + icon                  │
+│  - Polls result queue (0.5s timer)      │
+│  - Triggers notifications               │
+└────────┬────────────────────────────────┘
+         │
+         │ Queue[SyncResult]
+         │
+┌────────▼────────────────────────────────┐
+│  SyncWorker (Background Thread)         │
+│  - Timer: every N minutes (5/10/15/30)  │
+│  - Manual trigger via event flag        │
+│  - Calls run_once() → same sync logic   │
+│  - Puts SyncResult in queue             │
+└─────────────────────────────────────────┘
+```
+
+### New Components
+
+1. **`src/menu_bar_app.py`**
+   - Main UI class: `DropboxSyncApp(rumps.App)`
+   - Menu items: Status, Count, Sync Now, View Logs, Open Sheet, Preferences, About, Quit
+   - Polls result queue every 0.5s with `rumps.Timer`
+   - Updates UI based on `SyncResult` objects
+
+2. **`src/sync_worker.py`**
+   - Background thread class: `SyncWorker`
+   - Timer-based automatic sync (configurable interval)
+   - Manual sync trigger via `threading.Event`
+   - Initializes Gmail/Sheets clients in worker thread (thread safety)
+   - Sends `SyncResult` to queue after each sync
+
+3. **`src/notifications.py`**
+   - Wrappers for `rumps.notification()`
+   - Functions: `notify_new_comment()`, `notify_error()`, `notify_sync_summary()`
+   - Respects user preferences (can be disabled)
+
+4. **`src/preferences.py`**
+   - JSON-backed settings: `~/.dropbox-sync-prefs.json`
+   - Properties: `sync_interval_minutes`, `notify_new_comments`, `notify_errors`, `notify_summary`
+   - Auto-saves on change
+
+### Key Design Decisions
+
+**Why queue-based communication?**
+- `rumps.App` runs on main thread (event loop)
+- Sync operations are blocking (network I/O)
+- Queue allows non-blocking communication: worker pushes results, UI polls periodically
+
+**Why not callbacks?**
+- Callbacks from background thread would need thread-safe UI updates
+- Queue + timer polling is simpler and safer with `rumps`
+
+**Why initialize clients in worker thread?**
+- Gmail/Sheets API clients may not be thread-safe
+- Initializing in worker thread avoids cross-thread issues
+- Allows "reload credentials" feature (clear clients, re-init on next sync)
+
+**Why `threading.Event` for manual sync?**
+- UI thread sets event, worker thread checks it
+- Non-blocking, thread-safe
+- Allows immediate sync without waiting for timer
+
+### Integration with CLI
+
+The menu bar app **does not replace** the CLI version. Both coexist:
+
+**Shared**:
+- Same `run_once()` function
+- Same Gmail/Sheets clients
+- Same state file (`data/processed_state.json`)
+- Same config (`.env`)
+
+**Differences**:
+- CLI: Runs in terminal, scheduled by launchd
+- Menu bar: Runs in menu bar, scheduled by internal timer
+
+**Coexistence**:
+- Both can run simultaneously (not recommended)
+- State file prevents duplicate processing (deduplication by message ID)
+- No coordination between instances (both sync independently)
+
+**Recommended setup**:
+- Development: Use menu bar app (visual feedback)
+- Production: Use launchd (lightweight, no UI)
+- Temporarily: Run both for redundancy
+
+### Running the Menu Bar App
+
+```bash
+source venv/bin/activate
+python run_menubar.py
+```
+
+Or make it executable:
+```bash
+chmod +x run_menubar.py
+./run_menubar.py
+```
+
+**At login** (optional):
+- Add to **System Preferences** → **Users & Groups** → **Login Items**
+- Or create `.app` bundle with `py2app` (not included in v0.2.0)
+
+### Configuration
+
+**Preferences file**: `~/.dropbox-sync-prefs.json`
+
+```json
+{
+  "sync_interval_minutes": 15,
+  "notify_new_comments": true,
+  "notify_errors": true,
+  "notify_summary": false
+}
+```
+
+**Changing preferences**:
+1. Via UI: Click **Preferences** in menu
+2. Manually: Edit JSON file (requires restart)
+
+**Sync intervals**: 5, 10, 15, or 30 minutes (enforced by validation)
+
+### Known Limitations (v0.2.0)
+
+1. **Icon**: Uses static cloud emoji (☁️) instead of colored PNGs (gray/yellow/green/red)
+2. **Preferences UI**: Basic alert dialogs instead of proper settings window
+3. **Notification toggles**: Can't change from UI (must edit JSON)
+4. **Manual credential reload**: Not yet implemented in UI
+5. **No tray tooltip**: Icon doesn't show hover text
+6. **Single instance**: No check to prevent multiple instances running
+
+### Troubleshooting Menu Bar App
+
+**App won't start**:
+- Check terminal for errors
+- Verify `.env` exists and is valid
+- Ensure `rumps` is installed: `pip show rumps`
+
+**Notifications not appearing**:
+- Check **System Preferences** → **Notifications** → **Python** (or **Terminal**)
+- Verify notifications are allowed
+- Check preferences file: `cat ~/.dropbox-sync-prefs.json`
+
+**Sync not running**:
+- Check status in menu (click cloud icon)
+- View logs: Click **View Logs** in menu
+- Try manual sync: Click **Sync Now**
+
+**"Today's Count" not resetting**:
+- Count resets at midnight (system time)
+- Restart app if stuck
+
+### Menu Bar vs. CLI Comparison
+
+| Feature | CLI (`python -m src.sync`) | Menu Bar (`run_menubar.py`) |
+|---------|----------------------------|------------------------------|
+| Visual feedback | ❌ No (terminal only) | ✅ Yes (icon + menu) |
+| Manual sync | ❌ Restart script | ✅ "Sync Now" button |
+| Notifications | ❌ No | ✅ macOS Notification Center |
+| Scheduling | ⚙️ External (launchd) | ✅ Built-in timer |
+| Preferences | ⚙️ Edit `.env` | ✅ UI + JSON file |
+| Resource usage | ⚡ Minimal (only runs on schedule) | 🔄 Lightweight (idle most of time) |
+| Platform support | ✅ Cross-platform | 🍎 macOS only |
+| Background running | ✅ Yes (daemon) | ✅ Yes (menu bar) |
+
+### Future Menu Bar Enhancements
+
+- Custom colored PNG icons (resources/icon_cloud_*.png)
+- Rich preferences window with checkboxes
+- "Reload Credentials" menu item
+- Tooltip on icon hover
+- "View Comment Log" shortcut (opens sheet to log tab)
+- Auto-update check
+- Single instance enforcement (prevent multiple apps)
+- py2app packaging for standalone `.app` bundle
+
 ## Future Enhancement Ideas
 
 1. **Retry logic**: Add exponential backoff for transient failures
@@ -270,6 +465,15 @@ cat data/processed_state.json | python -m json.tool
 - **Dependencies**: All pinned in `requirements.txt` (use `pip list --outdated` to check for updates)
 
 ## Version History
+
+**v0.2.0 (2025-10-27)** - Menu bar app release
+- macOS menu bar application with visual feedback
+- Automatic sync timer (5/10/15/30 min intervals)
+- Native macOS notifications
+- User preferences with JSON persistence
+- Manual "Sync Now" button
+- Quick access to logs and Google Sheet
+- Coexists with launchd scheduler
 
 **v0.1.0 (2025-10-27)** - Initial production release
 - Gmail-based email monitoring
