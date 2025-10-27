@@ -58,6 +58,9 @@ class DropboxSyncApp(rumps.App):
         # Start the sync worker
         self.sync_worker.start()
 
+        # Override quit button with cleanup callback
+        self.quit_button = rumps.MenuItem("Quit", callback=self.on_quit)
+
     def _load_today_count(self) -> None:
         """Load today's count from preferences, reset if new day."""
         today_str = datetime.now().date().isoformat()
@@ -86,6 +89,10 @@ class DropboxSyncApp(rumps.App):
         # Today's count
         self.count_item = rumps.MenuItem("Today: 0 comments", callback=None)
 
+        # Sync interval display
+        interval = self.prefs.sync_interval_minutes
+        self.interval_item = rumps.MenuItem(f"Interval: Every {interval} min", callback=None)
+
         # Separator
         sep1 = rumps.separator
 
@@ -107,6 +114,7 @@ class DropboxSyncApp(rumps.App):
         self.menu = [
             self.status_item,
             self.count_item,
+            self.interval_item,
             sep1,
             self.sync_button,
             self.logs_button,
@@ -148,6 +156,11 @@ class DropboxSyncApp(rumps.App):
             self.count_item.title = "Today: 1 comment"
         else:
             self.count_item.title = f"Today: {self.today_comment_count} comments"
+
+    def _update_interval_display(self) -> None:
+        """Update the sync interval line in the menu."""
+        interval = self.prefs.sync_interval_minutes
+        self.interval_item.title = f"Interval: Every {interval} min"
 
     def _check_sync_results(self, _timer: rumps.Timer) -> None:
         """
@@ -248,39 +261,61 @@ class DropboxSyncApp(rumps.App):
 
     def show_preferences(self, _sender: rumps.MenuItem) -> None:
         """Callback for 'Preferences' button - show preferences dialog."""
-        current_interval = self.prefs.sync_interval_minutes
-        response = rumps.alert(
-            title="Preferences",
-            message=f"Current sync interval: {current_interval} minutes\n\nChoose new sync interval:",
-            ok="5 min",
-            cancel="Cancel",
-            other=["10 min", "15 min", "30 min"]
-        )
+        try:
+            current_interval = self.prefs.sync_interval_minutes
 
-        # Map response to interval
-        if response == 1:  # OK button
-            new_interval = 5
-        elif response == 0:  # Cancel
-            return
-        else:
-            # Other buttons (response > 1)
-            # rumps returns 0 for cancel, 1 for ok, 2+ for other buttons in order
-            other_intervals = [10, 15, 30]
-            if response - 2 < len(other_intervals):
-                new_interval = other_intervals[response - 2]
-            else:
+            # Create submenu with interval options
+            # Build button list: highlight current interval
+            intervals = [5, 10, 15, 30]
+            buttons = []
+            for interval in intervals:
+                if interval == current_interval:
+                    buttons.append(f"✓ {interval} minutes")
+                else:
+                    buttons.append(f"{interval} minutes")
+
+            # Show alert with buttons
+            response = rumps.alert(
+                title="Sync Interval",
+                message=f"Current: {current_interval} minutes\n\nChoose new interval:",
+                ok=buttons[0],  # 5 min
+                cancel="Cancel",
+                other=buttons[1:]  # 10, 15, 30 min
+            )
+
+            # Map response to interval
+            # response: 0=cancel, 1=ok (first button), 2+=other buttons
+            if response == 0:
+                # User cancelled
                 return
 
-        # Update preferences
-        self.prefs.sync_interval_minutes = new_interval
-        self.sync_worker.update_interval(new_interval)
+            # Determine which button was clicked
+            button_index = response - 1  # Convert to 0-based index
+            if 0 <= button_index < len(intervals):
+                new_interval = intervals[button_index]
 
-        rumps.notification(
-            title="Preferences Updated",
-            subtitle="",
-            message=f"Sync interval set to {new_interval} minutes",
-            sound=False
-        )
+                # Only update if changed
+                if new_interval != current_interval:
+                    # Update preferences
+                    self.prefs.sync_interval_minutes = new_interval
+                    self.sync_worker.update_interval(new_interval)
+
+                    # Update interval display in menu
+                    self._update_interval_display()
+
+                    rumps.notification(
+                        title="Preferences Updated",
+                        subtitle="",
+                        message=f"Sync interval changed to {new_interval} minutes",
+                        sound=False
+                    )
+        except Exception as e:
+            logging.error(f"Error in preferences dialog: {e}")
+            rumps.alert(
+                title="Error",
+                message=f"Failed to update preferences: {e}",
+                ok="OK"
+            )
 
     def show_about(self, _sender: rumps.MenuItem) -> None:
         """Callback for 'About' button."""
@@ -295,7 +330,6 @@ class DropboxSyncApp(rumps.App):
             ok="OK"
         )
 
-    @rumps.clicked("Quit")
     def on_quit(self, _sender: rumps.MenuItem) -> None:
         """Callback when Quit button is clicked - cleanup before exit."""
         logging.info("Quit requested by user")
