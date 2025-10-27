@@ -9,6 +9,7 @@ from pathlib import Path
 from queue import Empty, Queue
 
 import rumps
+from AppKit import NSApplication
 
 from .config import Config, load_config
 from .preferences import Preferences
@@ -262,6 +263,9 @@ class DropboxSyncApp(rumps.App):
     def show_preferences(self, _sender: rumps.MenuItem) -> None:
         """Callback for 'Preferences' button - show preferences dialog."""
         try:
+            # Bring app to front so dialog appears on top of other windows
+            NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+
             current_interval = self.prefs.sync_interval_minutes
 
             # Use text input window (more reliable than alert buttons)
