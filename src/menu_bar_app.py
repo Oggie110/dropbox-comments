@@ -16,11 +16,8 @@ from .sync_worker import SyncResult, SyncStatus, SyncWorker
 from . import notifications
 
 
-# Icon states (using emoji for simplicity - can be replaced with PNG files)
-ICON_IDLE = "☁️"
-ICON_SYNCING = "☁️"  # Will be shown with different menu text
-ICON_SUCCESS = "☁️"
-ICON_ERROR = "☁️"
+# Icon path (template=True makes it adapt to light/dark mode)
+ICON_PATH = str(Path(__file__).parent.parent / "resources" / "icon_cloud.png")
 
 
 class DropboxSyncApp(rumps.App):
@@ -29,7 +26,8 @@ class DropboxSyncApp(rumps.App):
     def __init__(self, config: Config, preferences: Preferences):
         super().__init__(
             name="Dropbox Sync",
-            title="☁️",  # Use title instead of icon for emoji
+            icon=ICON_PATH,
+            template=True,  # Makes icon adapt to light/dark mode
         )
 
         self.config = config
