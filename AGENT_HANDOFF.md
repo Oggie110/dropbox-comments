@@ -342,6 +342,8 @@ chmod +x run_menubar.py
 ### Known Limitations (v0.2.0)
 
 1. **Icon**: Uses static cloud emoji (☁️) instead of colored PNGs (gray/yellow/green/red)
+   - **Technical note**: rumps treats `icon` parameter as file path, so emoji must be passed via `title` parameter
+   - To use custom PNG icons, add files to `resources/` and update `title` to `icon` with file path
 2. **Preferences UI**: Basic alert dialogs instead of proper settings window
 3. **Notification toggles**: Can't change from UI (must edit JSON)
 4. **Manual credential reload**: Not yet implemented in UI
@@ -354,6 +356,18 @@ chmod +x run_menubar.py
 - Check terminal for errors
 - Verify `.env` exists and is valid
 - Ensure `rumps` is installed: `pip show rumps`
+
+**FileNotFoundError with emoji icon**:
+- Error: `FileNotFoundError: [Errno 2] No such file or directory: '☁️'`
+- Cause: rumps treats `icon` parameter as file path, not string
+- Solution: Use `title` parameter for emoji: `rumps.App(title="☁️")`
+- For PNG icons: Use `icon` parameter with file path: `rumps.App(icon="resources/icon.png")`
+
+**NSInternalInconsistencyException on Quit button**:
+- Error: "Item to be inserted into menu already is in another menu"
+- Cause: Custom quit button conflicts with rumps' built-in quit
+- Solution: Don't pass `quit_button=None`, let rumps handle quit automatically
+- For cleanup: Use `@rumps.clicked("Quit")` decorator to intercept quit action
 
 **Notifications not appearing**:
 - Check **System Preferences** → **Notifications** → **Python** (or **Terminal**)

@@ -265,6 +265,17 @@ Both use the same state file (`data/processed_state.json`), so:
 - Activate virtual environment: `source venv/bin/activate`
 - Install dependencies: `pip install -r requirements.txt`
 
+**Error: "FileNotFoundError: [Errno 2] No such file or directory: '☁️'"**
+- **Cause**: rumps treats `icon` parameter as a file path, not a string
+- **Solution**: The app now uses `title="☁️"` instead of `icon="☁️"`
+- **If you encounter this**: Update to latest version from feature branch
+- **For custom PNG icons**: Use `icon="path/to/file.png"` instead of `title`
+
+**Error: "NSInternalInconsistencyException - Item to be inserted into menu already is in another menu"**
+- **Cause**: Custom quit button conflicts with rumps' built-in quit button
+- **Solution**: Don't override quit button, let rumps handle it automatically
+- **Fixed in**: Latest commit on feature/menu-bar-app branch
+
 ### Notifications Not Appearing
 
 1. Check **System Preferences** → **Notifications** → **Python** (or **Terminal**)
@@ -294,7 +305,10 @@ Currently the app uses a static cloud emoji (☁️) for all states. To use cust
 
 ### Version 0.2.0
 
-- **Icon**: Uses emoji instead of custom colored icons
+- **Icon**: Uses emoji (☁️) instead of custom colored PNG icons
+  - **Why**: rumps treats `icon` parameter as file path; emoji must use `title` parameter
+  - **Implication**: Icon color doesn't change to indicate status (stays constant)
+  - **Future**: Can add PNG icons to `resources/` and switch to `icon` parameter
 - **Preferences UI**: Basic alert dialogs instead of proper settings window
 - **Notification settings**: Can't toggle notification types from UI (must edit JSON)
 - **Last sync time**: Only shows time, not date (for older syncs)
