@@ -1,0 +1,15 @@
+.env
+*.pyc
+__pycache__/
+venv/
+.venv/
+build/
+dist/
+credentials/
+service_account.json
+*.log
+data/
+logs/
+.DS_Store
+*.plist
+!launchd/*.plist.example
