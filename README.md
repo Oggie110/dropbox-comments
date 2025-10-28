@@ -1,6 +1,6 @@
 # Dropbox Comment Sync
 
-**Version 0.1.0** | [GitHub](https://github.com/Oggie110/dropbox-comments) | [Handoff Doc](AGENT_HANDOFF.md)
+**Version 0.2.0** | [GitHub](https://github.com/Oggie110/dropbox-comments) | [Handoff Doc](AGENT_HANDOFF.md) | [Menu Bar Docs](docs/MENUBAR.md)
 
 > Automates syncing Dropbox file comment notifications from Gmail to Google Sheets
 
@@ -36,6 +36,27 @@ launchctl load ~/Library/LaunchAgents/com.motive.dropbox-comments.plist
 ```
 
 See detailed setup instructions below ↓
+
+## 🖥️ Menu Bar App (v0.2.0)
+
+**NEW**: Visual menu bar interface for macOS!
+
+```bash
+# After setup, run the menu bar app instead of CLI:
+python run_menubar.py
+```
+
+**Features:**
+- ☁️ Cloud icon in menu bar shows sync status
+- 🔄 Automatic sync every 5/10/15/30 minutes (configurable)
+- 🔔 Native macOS notifications for new comments
+- 📊 Quick access to Google Sheet
+- 📜 View logs with one click
+- ⚙️ Easy preferences management
+
+[Full Menu Bar Documentation →](docs/MENUBAR.md)
+
+**Note**: The menu bar app can run alongside or instead of the launchd scheduler.
 
 ## ✨ Key Features
 - 📬 **Gmail monitoring** - Watches for forwarded Dropbox comment notifications
@@ -203,6 +224,14 @@ python -m src.sync --once --verbose
 - Check that APIs are enabled in Google Cloud Console
 
 ## 📝 Version History
+
+### v0.2.0 (2025-10-27)
+- **NEW**: macOS menu bar application with visual feedback
+- Automatic sync timer (5/10/15/30 min intervals)
+- Native macOS notifications
+- User preferences with JSON persistence
+- Manual "Sync Now" button
+- Quick access to logs and Google Sheet
 
 ### v0.1.0 (2025-10-27)
 - Initial release
