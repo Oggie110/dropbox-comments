@@ -14,7 +14,7 @@ from AppKit import NSApplication
 from .config import Config, load_config
 from .preferences import Preferences
 from .sync_worker import SyncResult, SyncStatus, SyncWorker
-from . import notifications
+from . import LOG_DIR, LOG_FILE, notifications
 
 
 # Icon path (template=True makes it adapt to light/dark mode)
@@ -246,13 +246,12 @@ class DropboxSyncApp(rumps.App):
 
     def view_logs(self, _sender: rumps.MenuItem) -> None:
         """Callback for 'View Logs' button - open logs directory in Finder."""
-        logs_dir = Path(self.config.state_file).parent.parent / "logs"
-        if logs_dir.exists():
-            subprocess.run(["open", str(logs_dir)])
+        if LOG_DIR.exists():
+            subprocess.run(["open", str(LOG_DIR)])
         else:
             rumps.alert(
                 title="Logs Not Found",
-                message=f"Logs directory does not exist:\n{logs_dir}"
+                message=f"Logs directory does not exist:\n{LOG_DIR}"
             )
 
     def open_sheet(self, _sender: rumps.MenuItem) -> None:
@@ -345,10 +344,16 @@ class DropboxSyncApp(rumps.App):
 def main():
     """Main entry point for the menu bar app."""
     # Configure logging
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(LOG_FILE, encoding="utf-8"),
+        ],
+        force=True,
     )
 
     # Load configuration

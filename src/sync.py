@@ -12,6 +12,7 @@ from .gmail_client import GmailCommentFetcher, DropboxCommentEmail
 from .matcher import SongMatcher, normalize_title
 from .sheets_client import SheetsClient, SongRow
 from .state_store import FileRowBinding, StateStore
+from . import LOG_DIR, LOG_FILE
 
 
 COMMENT_LOG_HEADER = [
@@ -31,10 +32,16 @@ COMMENT_LOG_HEADER = [
 
 def configure_logging(verbose: bool) -> None:
     level = logging.DEBUG if verbose else logging.INFO
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
         level=level,
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(LOG_FILE, encoding="utf-8"),
+        ],
+        force=True,
     )
 
 
